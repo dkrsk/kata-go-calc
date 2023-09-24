@@ -4,13 +4,13 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 )
 
 var ArabicAlp = []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"}
-var RomeAlp = []string{"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"}
+var RomeAlp = []string{"", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"}
+var Alphabet = map[string]int{"I": 1, "V": 5, "X": 10, "L": 50, "C": 100}
 
 type Operator int16
 
@@ -19,6 +19,14 @@ const (
 	Minus    Operator = 1
 	Multiply Operator = 2
 	Divide   Operator = 3
+)
+
+const (
+	BadRomeResult = "Вывод ошибки, так как в римской системе нет отрицательных чисел."
+	TwoTypesUsage = "Вывод ошибки, так как используются одновременно разные системы счисления."
+	NotAEquation  = "Вывод ошибки, так как строка не является математической операцией."
+	BadFormat     = "Вывод ошибки, так как формат математической операции не удовлетворяет заданию — два операнда и один оператор"
+	BadRange      = "Вывод ошибки, так как числа не в диапазоне от 1 до 10"
 )
 
 type NumType int16
@@ -39,8 +47,7 @@ func main() {
 	fmt.Println("DnKrsk GoLang Calculator for Kata.")
 
 	var input = GetInput()
-
-	fmt.Println(input)
+	fmt.Println(Calc(input))
 }
 
 func GetInput() Input {
@@ -48,11 +55,16 @@ func GetInput() Input {
 	input := Input{}
 
 	str, _ := reader.ReadString('\n')
-	tmp := strings.Split(str[:len(str)-2], " ")
+	str = strings.ToUpper(str[:len(str)-2])
+	//str = strings.ReplaceAll(str, " ", "")
+	tmp := strings.Split(str, " ")
+	if len(tmp) != 3 {
+		panic(BadFormat)
+	}
 
 	if CheckNumType(str) == Rome {
-		input.left = slices.Index(RomeAlp, tmp[0]) + 1
-		input.right = slices.Index(RomeAlp, tmp[2]) + 1
+		input.left = RomeToArb(tmp[0])
+		input.right = RomeToArb(tmp[2])
 		input.NumberType = Rome
 	} else {
 		input.left, _ = strconv.Atoi(tmp[0])
@@ -73,16 +85,49 @@ func GetInput() Input {
 	case "/":
 		input.Operation = Divide
 		break
+	default:
+		panic(NotAEquation)
 	}
 
 	return input
 }
 
+func Calc(input Input) string {
+	var res int
+
+	if input.left > 10 || input.right > 10 {
+		panic(BadRange)
+	}
+
+	switch input.Operation {
+	case Plus:
+		res = input.left + input.right
+		break
+	case Minus:
+		res = input.left - input.right
+		break
+	case Divide:
+		res = input.left / input.right
+		break
+	case Multiply:
+		res = input.left * input.right
+		break
+	}
+
+	if input.NumberType == Arabic {
+		return strconv.Itoa(res)
+	} else {
+		if res <= 0 {
+			panic(BadRomeResult)
+		}
+		return ArbToRome(res)
+	}
+}
+
 func CheckNumType(str string) NumType {
 	if Contains(str, ArabicAlp) {
 		if Contains(str, RomeAlp) {
-			fmt.Println("братик ты куда")
-			os.Exit(0)
+			panic(TwoTypesUsage)
 		}
 		return Arabic
 	} else {
@@ -99,4 +144,32 @@ func Contains(str string, alp []string) bool {
 		}
 	}
 	return false
+}
+
+func RomeToArb(rome string) int {
+	var result int
+
+	for q := 0; q < len(rome)-1; q++ {
+		if Alphabet[string(rome[q])] < Alphabet[string(rome[q+1])] {
+			result -= Alphabet[string(rome[q])]
+		} else {
+			result += Alphabet[string(rome[q])]
+		}
+	}
+	result += Alphabet[string(rome[len(rome)-1])]
+	if result == 0 {
+		panic(NotAEquation)
+	}
+	return result
+}
+func ArbToRome(arb int) string {
+	var result string
+	d := arb / 100
+	result += strings.Repeat("C", d)
+	arb %= 100
+	d = arb / 10
+	result += strings.Repeat("X", d)
+	arb %= 10
+	result += RomeAlp[arb]
+	return result
 }
